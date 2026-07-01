@@ -3,29 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Le Bon But 🃏</title>
+    <title>Domino - Le Bon Jeu 🃏</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Le Bon But">
+    <meta name="apple-mobile-web-app-title" content="Le Bon Jeu">
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans antialiased selection:bg-indigo-500 selection:text-white">
 
     <header class="bg-indigo-600 py-4 px-6 text-center shadow-lg sticky top-0 z-10 border-b border-indigo-500/20">
         <h1 class="text-xl font-extrabold tracking-wide uppercase flex items-center justify-center gap-2">
-            <span>🃏</span> Le Bon But <span class="text-indigo-200 font-medium text-sm lowercase italic">jeux en famille</span>
+            <span>🃏</span> Le Bon Jeu <span class="text-indigo-200 font-medium text-sm lowercase italic">calculateur</span>
         </h1>
     </header>
 
-    <main class="flex-grow p-4 max-w-md mx-auto w-full flex flex-col justify-center space-y-4">
-        <p class="text-center text-sm text-slate-400 italic mb-2">Choisissez votre outil pour la partie :</p>
+    <main class="flex-grow p-4 max-w-md mx-auto w-full space-y-6">
         
-        <!-- Bouton Calculateur -->
-        <a href="calculateur.html" class="flex items-center gap-4 bg-slate-800/80 hover:bg-slate-800 p-5 rounded-2xl border border-slate-700/50 shadow-xl transition-all hover:-translate-y-0.5 active:translate-y-0">
-            <span class="text-3xl">🧮</span>
-            <div>
-                <h3 class="font-bold text-lg text-white">Calculateur de Scores</h3>
-                <p class="text-xs text-slate-400">Ratatouille & Domino</p>
+        <section class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-2xl border border-slate-700/50 shadow-xl space-y-4">
+            <h2 class="text-sm font-semibold tracking-wider text-slate-400 uppercase mb-2">Scores de la Ratatouille</h2>
+            
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 font-medium pl-1">Joueur 1</label>
+                    <input type="number" id="j1" oninput="calculer()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-center font-bold text-lg focus:outline-none focus:border-indigo-500 text-indigo-400" placeholder="0">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 font-medium pl-1">Joueur 2</label>
+                    <input type="number" id="j2" oninput="calculer()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-center font-bold text-lg focus:outline-none focus:border-indigo-500 text-indigo-400" placeholder="0">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 font-medium pl-1">Joueur 3</label>
+                    <input type="number" id="j3" oninput="calculer()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-center font-bold text-lg focus:outline-none focus:border-indigo-500 text-indigo-400" placeholder="0">
+                </div>
+                <div>
+                    <label class="block text-xs text-slate-400 mb-1 font-medium pl-1">Joueur 4</label>
+                    <input type="number" id="j4" oninput="calculer()" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2.5 text-center font-bold text-lg focus:outline-none focus:border-indigo-500 text-indigo-400" placeholder="0">
+                </div>
             </div>
         </section>
 
@@ -39,27 +52,27 @@
             
             <div class="space-y-2.5">
                 <div class="flex justify-between items-center bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800">
-                    <span class="font-medium text-slate-300">👌 1er arrivé</span>
+                    <span class="font-medium text-slate-300">🥇 1er arrivé</span>
                     <span id="p1" class="font-black text-emerald-400 text-lg">0 pts</span>
                 </div>
                 <div class="flex justify-between items-center bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800">
-                    <span class="font-medium text-slate-300">😅 2ème arrivé</span>
+                    <span class="font-medium text-slate-300">🥈 2ème arrivé</span>
                     <span id="p2" class="font-black text-blue-400 text-lg">15 pts</span>
                 </div>
                 <div class="flex justify-between items-center bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800">
-                    <span class="font-medium text-slate-300">🥵 3ème arrivé</span>
+                    <span class="font-medium text-slate-300">🥉 3ème arrivé</span>
                     <span id="p3" class="font-black text-amber-500 text-lg">30 pts</span>
                 </div>
                 <div class="flex justify-between items-center bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800">
-                    <span class="font-medium text-slate-300">💀 4ème arrivé</span>
+                    <span class="font-medium text-slate-300">🍫 4ème arrivé</span>
                     <span id="p4" class="font-black text-rose-500 text-lg">60 pts</span>
                 </div>
             </div>
-        </a>
+        </section>
     </main>
 
     <footer class="py-4 text-center text-xs text-slate-500 border-t border-slate-800/60 bg-slate-950/40">
-        Le Bon But © Famille - Prêt pour la partie
+        Le Bon Jeu © Famille - Prêt pour la partie
     </footer>
 
     <script>

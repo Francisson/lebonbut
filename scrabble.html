@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Arbitre Scrabble - Le Bon Jeu</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between font-sans antialiased selection:bg-indigo-500 selection:text-white">
+
+    <header class="bg-indigo-600 py-4 px-6 text-center shadow-lg sticky top-0 z-10 border-b border-indigo-500/20">
+        <h1 class="text-xl font-extrabold tracking-wide uppercase flex items-center justify-center gap-2">
+            <span>🃏</span> Le Bon Jeu <span class="text-indigo-200 font-medium text-sm lowercase italic">scrabble</span>
+        </h1>
+    </header>
+
+    <main class="flex-grow p-4 max-w-md mx-auto w-full space-y-6">
+        
+        <!-- Bloc Recherche -->
+        <section class="bg-slate-800/50 backdrop-blur-sm p-5 rounded-2xl border border-slate-700/50 shadow-xl space-y-4">
+            <h2 class="text-sm font-semibold tracking-wider text-slate-400 uppercase mb-2">Vérifier un mot (ODS9)</h2>
+            
+            <div class="flex gap-2">
+                <input type="text" id="motInput" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 font-bold text-lg focus:outline-none focus:border-indigo-500 text-indigo-400 uppercase placeholder:normal-case placeholder:font-normal placeholder:text-sm" placeholder="Entrez un mot...">
+                <button onclick="verifierMot()" class="bg-slate-700 hover:bg-slate-600 border border-slate-600 text-white px-4 py-2.5 rounded-xl font-bold transition-colors cursor-pointer active:bg-slate-800">Vérifier</button>
+            </div>
+            
+            <div id="statutChargement" class="text-xs text-slate-400 italic text-center min-h-[1rem]"></div>
+        </section>
+
+        <!-- Bloc Résultat -->
+        <section id="zoneResultat" class="bg-slate-800/80 p-5 rounded-2xl border shadow-2xl space-y-3.5 hidden">
+            <div class="flex justify-between items-center border-b border-slate-700/50 pb-2">
+                <h2 id="statutMot" class="font-black text-xl"></h2>
+                <span id="scoreMot" class="font-black text-sm bg-slate-900 px-3 py-1 rounded-lg border border-slate-700 text-indigo-300"></span>
+            </div>
+            <div id="textDefinition" class="bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800 text-sm text-slate-300 leading-relaxed max-h-60 overflow-y-auto"></div>
+        </section>
+
+        <!-- Retour -->
+        <div class="text-center">
+            <a href="index.html" class="text-xs text-slate-400 hover:text-indigo-400 underline transition-colors">← Retour à l'accueil</a>
+        </div>
+    </main>
+
+    <footer class="py-4 text-center text-xs text-slate-500 border-t border-slate-800/60 bg-slate-950/40">
+        Le Bon Jeu © Famille - Prêt pour la partie
+    </footer>
+
+    <script>
+        let dictionnaireScrabble = null;
+        let jsonDefinitionsComplet = null; // Contiendra le JSON complet s'il est chargé une fois
+
+        const valeursLettres = {
+            'A':1, 'E':1, 'I':1, 'L':1, 'N':1, 'O':1, 'R':1, 'S':1, 'T':1, 'U':1,
+            'D':2, 'G':2, 'M':2,
+            'B':3, 'C':3, 'P':3,
+            'F':4, 'H':4, 'V':4,
+            'J':8, 'Q':8,
+            'K':10, 'W':10, 'X':10, 'Y':10, 'Z':10
+        };
+
+        function calculerPoints(mot) {
+            const motPropre = mot.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+            let total = 0;
+            for (let lettre of motPropre) {
+                total += valeursLettres[lettre] || 0;
+            }
+            return total;
+        }
+
+        async function chargerDictionnaire() {
+            const statutChargement = document.getElementById('statutChargement');
+            statutChargement.innerHTML = "⏳ Chargement de l'ODS9...";
+            
+            const urlRaw = "https://raw.githubusercontent.com/MarioSwitch/ScrabbHelper/refs/heads/master/app/src/main/assets/ods9.txt"; 
+            
+            try {
+                const response = await fetch(urlRaw);
+                if (!response.ok) throw new Error();
+                const texteBrut = await response.text();
+                
+                const listeMots = texteBrut.split(/\r?\n/)
+                                           .map(mot => mot.trim().toUpperCase())
+                                           .filter(mot => mot.length > 0);
+                
+                if (listeMots.length > 0) {
+                    dictionnaireScrabble = new Set(listeMots);
+                    statutChargement.innerHTML = `✅ ODS9 prêt (${dictionnaireScrabble.size} mots) !`;
+                    setTimeout(() => statutChargement.innerHTML = "", 3000);
+                    return true;
+                }
+                throw new Error();
+            } catch (error) {
+                statutChargement.innerHTML = "❌ Erreur de téléchargement du dictionnaire ODS9.";
+                return false;
+            }
+        }
+
+        // Va chercher la définition directement dans le JSON de MarioSwitch et la met en forme
+        async function extraireDefinitionDepuisJSON(motRecherche) {
+            try {
+                if (!jsonDefinitionsComplet) {
+                    const urlJson = "https://raw.githubusercontent.com/MarioSwitch/ScrabbHelper/refs/heads/master/app/src/main/assets/definitions_fr.json";
+                    const response = await fetch(urlJson);
+                    if (!response.ok) return "Erreur lors du téléchargement du dictionnaire de définitions.";
+                    jsonDefinitionsComplet = await response.json();
+                }
+
+                let definition = jsonDefinitionsComplet[motRecherche.toLowerCase()] || jsonDefinitionsComplet[motRecherche.toUpperCase()];
+                
+                if (definition) {
+                    // Remplace les espaces suivis d'un chiffre et d'un point (ex: " 2.") par un saut de ligne
+                    // Le \b\d+\. repère n'importe quel nombre suivi d'un point (1., 2., 10., etc.)
+                    let definitionFormatee = definition.replace(/\s+(\b\d+\.)/g, '<br><span class="text-indigo-400 font-medium">$1</span>');
+                    
+                    // Optionnel : Met en valeur le tout premier "1." s'il commence la définition
+                    definitionFormatee = definitionFormatee.replace(/^(\b\d+\.)/, '<br><span class="text-indigo-400 font-medium">$1</span>');
+
+                    return definitionFormatee;
+                }
+                return "Mot valide, mais aucune définition présente dans ce dictionnaire.";
+            } catch (e) {
+                console.error(e);
+                return "Erreur lors de la lecture de la définition.";
+            }
+        }
+
+        async function verifierMot() {
+            const input = document.getElementById('motInput');
+            const zoneResultat = document.getElementById('zoneResultat');
+            const statutMot = document.getElementById('statutMot');
+            const scoreMot = document.getElementById('scoreMot');
+            const textDefinition = document.getElementById('textDefinition');
+            
+            let mot = input.value.trim().toUpperCase();
+            if (!mot) return;
+
+            if (!dictionnaireScrabble) {
+                const succes = await chargerDictionnaire();
+                if (!succes) return;
+            }
+
+            zoneResultat.classList.remove('hidden');
+            textDefinition.innerHTML = "🔍 Recherche de la définition dans le JSON (Premier chargement : ~10 secondes)...";
+            scoreMot.classList.add('hidden');
+
+            const motSansAccent = mot.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+            if (dictionnaireScrabble.has(motSansAccent)) {
+                const points = calculerPoints(motSansAccent);
+                scoreMot.innerText = `${points} pts`;
+                scoreMot.classList.remove('hidden');
+
+                zoneResultat.className = "bg-slate-800/80 p-5 rounded-2xl border border-emerald-500/30 shadow-2xl space-y-3.5";
+                statutMot.className = "font-black text-xl text-emerald-400";
+                statutMot.innerHTML = `🥇 "${motSansAccent}"`;
+                
+                // Appel de l'extracteur sur le JSON officiel
+                const defTrouvee = await extraireDefinitionDepuisJSON(motSansAccent);
+                textDefinition.innerHTML = `<strong>Définition :</strong> ${defTrouvee}`;
+
+            } else {
+                zoneResultat.className = "bg-slate-800/80 p-5 rounded-2xl border border-rose-500/30 shadow-2xl space-y-3.5";
+                statutMot.className = "font-black text-xl text-rose-500";
+                statutMot.innerHTML = `🍫 "${motSansAccent}" REJETÉ`;
+                textDefinition.innerHTML = "Ce mot ne figure pas dans l'Officiel du Scrabble v9.";
+            }
+        }
+
+        document.getElementById('motInput').addEventListener('keypress', e => {
+            if (e.key === 'Enter') verifierMot();
+        });
+    </script>
+</body>
+</html>

@@ -57,15 +57,15 @@
                 </div>
                 <div class="flex justify-between items-center bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800">
                     <span class="font-medium text-slate-300">🥈 2ème arrivé</span>
-                    <span id="p2" class="font-black text-blue-400 text-lg">15 pts</span>
+                    <span id="p2" class="font-black text-blue-400 text-lg">20 pts</span>
                 </div>
                 <div class="flex justify-between items-center bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800">
                     <span class="font-medium text-slate-300">🥉 3ème arrivé</span>
-                    <span id="p3" class="font-black text-amber-500 text-lg">30 pts</span>
+                    <span id="p3" class="font-black text-amber-500 text-lg">40 pts</span>
                 </div>
                 <div class="flex justify-between items-center bg-slate-900/60 px-4 py-3 rounded-xl border border-slate-800">
                     <span class="font-medium text-slate-300">🍫 4ème arrivé</span>
-                    <span id="p4" class="font-black text-rose-500 text-lg">60 pts</span>
+                    <span id="p4" class="font-black text-rose-500 text-lg">50 pts</span>
                 </div>
             </div>
         </section>
@@ -100,9 +100,9 @@
 
             // Calcul des points de bonus/malus du domino
             const res1 = 0;
-            const res2 = 15 + (0.20 * ecart);
-            const res3 = 30 + (0.30 * ecart);
-            const res4 = 60 + (0.50 * ecart);
+            const res2 = 20 + (0.30 * ecart);
+            const res3 = 40 + (0.60 * ecart);
+            const res4 = 50 + (1.05 * ecart);
 
             // Injection dans le HTML
             document.getElementById('p1').innerText = res1.toFixed(0) + " pts";

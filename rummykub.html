@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbitre Rummikub - Le Bon Jeu</title>
+    
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    
+    <style>
+        /* Uniquement le style spécifique à la caméra et aux scores */
+        .rummikub-card {
+            background-color: #1a2236;
+            border: 1px solid #2a3650;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        #webcam-container {
+            margin: 0 auto 20px auto;
+            max-width: 100%;
+            width: 400px;
+            border: 2px solid #2a3650;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #101624;
+            aspect-ratio: 4/3;
+        }
+
+        #webcam-container canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+
+        .action-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .action-group button {
+            flex: 1;
+            min-width: 130px;
+            padding: 12px 20px;
+            font-size: 1rem;
+            font-weight: bold;
+            background-color: #212a42;
+            color: #ffffff;
+            border: 1px solid #2a3650;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .action-group button:hover:not(:disabled) {
+            background-color: #2a3650;
+            border-color: #3a4a6e;
+        }
+
+        .action-group button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        #btn-scan {
+            background-color: #2e3d61;
+            border-color: #3a4a6e;
+        }
+        #btn-scan:hover:not(:disabled) {
+            background-color: #3a4a6e;
+        }
+
+        .result-display {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #101624;
+            border-radius: 8px;
+            border: 1px solid #2a3650;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            text-align: left;
+        }
+
+        .score-total {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #e74c3c;
+            margin: 5px 0 0 0;
+        }
+
+        .liste-tuiles {
+            color: #bdc3c7;
+            font-style: italic;
+            word-wrap: break-word;
+            margin: 5px 0 0 0;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🧩 Arbitre Rummikub <span class="subtitle">- Malus Caméra</span></h1>
+    </header>
+
+    <main>
+        <p class="welcome-text">Scannez vos tuiles restantes pour calculer automatiquement votre score négatif.</p>
+
+        <div class="rummikub-card">
+            <div id="webcam-container">
+                </div>
+
+            <div class="action-group">
+                <button id="btn-start" onclick="init()">Activer la caméra</button>
+                <button id="btn-scan" onclick="scannerTuile()" disabled>Scanner la tuile</button>
+                <button id="btn-clear" onclick="reinitialiser()">Vider le chevalet</button>
+            </div>
+        </div>
+
+        <div class="rummikub-card">
+            <div class="result-display">
+                <strong>Tuiles enregistrées :</strong>
+                <p class="liste-tuiles" id="tuiles-scannees">Aucune tuile sur le chevalet</p>
+            </div>
+            
+            <div class="result-display" style="text-align: center;">
+                <strong>TOTAL PENALITE</strong>
+                <p class="score-total"><span id="total-points">0</span> pts</p>
+            </div>
+        </div>
+
+        <div class="back-nav">
+            <a href="index.html" class="back-link">⬅ Retour à l'accueil</a>
+        </div>
+    </main>
+
+    <footer>
+        Le Bon Jeu © Famille - Prêt pour la partie
+    </footer>
+
+    <script type="text/javascript">
+        const URL_MODELE = "https://teachablemachine.withgoogle.com/models/V9m8_X6vP/"; 
+
+        let model, webcam, maxPredictions;
+        let listeTuilesScannees = [];
+        let totalPoints = 0;
+
+        const btnStart = document.getElementById('btn-start');
+        const btnScan = document.getElementById('btn-scan');
+        const txtTuiles = document.getElementById('tuiles-scannees');
+        const txtTotal = document.getElementById('total-points');
+
+        async function init() {
+            btnStart.disabled = true;
+            btnStart.innerText = "Calculateur...";
+
+            const modelURL = URL_MODELE + "model.json";
+            const metadataURL = URL_MODELE + "metadata.json";
+
+            try {
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                const flip = false; 
+                webcam = new tmImage.Webcam(400, 300, flip);
+                await webcam.setup({ facingMode: "environment" }); 
+                await webcam.play();
+                
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                window.requestAnimationFrame(loop);
+
+                btnStart.style.display = "none";
+                btnScan.disabled = false;
+            } catch (error) {
+                alert("Erreur d'accès à la caméra : " + error);
+                btnStart.disabled = false;
+                btnStart.innerText = "Activer la caméra";
+            }
+        }
+
+        async function loop() {
+            webcam.update();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function scannerTuile() {
+            if (!model || !webcam) return;
+
+            const prediction = await model.predict(webcam.canvas);
+            
+            let meilleurePrediction = { className: "", probability: 0 };
+            for (let i = 0; i < maxPredictions; i++) {
+                if (prediction[i].probability > meilleurePrediction.probability) {
+                    meilleurePrediction = prediction[i];
+                }
+            }
+
+            if (meilleurePrediction.probability > 0.75) {
+                const resultat = meilleurePrediction.className;
+                
+                if (resultat.toLowerCase() !== "vide" && resultat.toLowerCase() !== "background") {
+                    ajouterTuile(resultat);
+                } else {
+                    alert("Aucune tuile reconnue.");
+                }
+            } else {
+                alert("Détection incertaine, ajustez la distance.");
+            }
+        }
+
+        function ajouterTuile(nomClasse) {
+            let valeurPoints = 0;
+
+            if (nomClasse.toLowerCase() === "joker") {
+                valeurPoints = 30; 
+            } else {
+                const nombreExtrait = nomClasse.match(/\d+/);
+                valeurPoints = nombreExtrait ? parseInt(nombreExtrait[0], 10) : 0;
+            }
+
+            if (valeurPoints > 0) {
+                listeTuilesScannees.push(nomClasse);
+                totalPoints += valeurPoints;
+
+                txtTuiles.innerText = listeTuilesScannees.join(', ');
+                txtTotal.innerText = totalPoints;
+            }
+        }
+
+        function reinitialiser() {
+            listeTuilesScannees = [];
+            totalPoints = 0;
+            txtTuiles.innerText = "Aucune tuile sur le chevalet";
+            txtTotal.innerText = "0";
+        }
+    </script>
+</body>
+</html>

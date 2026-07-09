@@ -3,16 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Arbitre Rummikub - Le Bon Jeu</title>
+    <title>Arbitre Rummikub - Photo OCR - Le Bon Jeu</title>
     
     <!-- Liaison avec ton fichier CSS existant -->
     <link rel="stylesheet" href="style.css">
 
-    <!-- Chargement de Tesseract.js pour l'OCR (Reconnaissance de texte) -->
+    <!-- Chargement de Tesseract.js pour l'OCR -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
     <style>
-        /* Style spécifique à la caméra et aux scores */
         .rummikub-card {
             background-color: #1a2236;
             border: 1px solid #2a3650;
@@ -22,76 +21,46 @@
             text-align: center;
         }
 
-        #camera-wrapper {
+        /* Style pour masquer l'input type file moche et le remplacer par un joli bouton */
+        .file-input-wrapper {
             position: relative;
-            margin: 0 auto 20px auto;
-            max-width: 100%;
-            width: 400px;
-            border: 2px solid #2a3650;
-            border-radius: 8px;
             overflow: hidden;
-            background-color: #101624;
-            aspect-ratio: 4/3;
+            display: inline-block;
         }
 
-        #video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
-        /* Viseur pour aider l'utilisateur à centrer la tuile */
-        .viseur {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 80px;
-            height: 110px;
-            border: 3px dashed #2ecc71;
-            border-radius: 8px;
-            pointer-events: none;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
-        }
-
-        .action-group {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-        }
-
-        .action-group button {
-            flex: 1;
-            min-width: 130px;
-            padding: 12px 20px;
-            font-size: 1rem;
+        .btn-choose-file {
+            padding: 14px 24px;
+            font-size: 1.1rem;
             font-weight: bold;
-            background-color: #212a42;
+            background-color: #2e3d61;
             color: #ffffff;
-            border: 1px solid #2a3650;
+            border: 1px solid #3a4a6e;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: background 0.2s;
         }
 
-        .action-group button:hover:not(:disabled) {
-            background-color: #2a3650;
-            border-color: #3a4a6e;
-        }
-
-        .action-group button:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        #btn-scan {
-            background-color: #2e3d61;
-            border-color: #3a4a6e;
-        }
-        #btn-scan:hover:not(:disabled) {
+        .btn-choose-file:hover {
             background-color: #3a4a6e;
+        }
+
+        .file-input-wrapper input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Aperçu de la photo prise */
+        #img-preview {
+            max-width: 100%;
+            max-height: 300px;
+            margin-top: 15px;
+            border-radius: 8px;
+            border: 1px solid #2a3650;
+            display: none;
         }
 
         .result-display {
@@ -101,7 +70,6 @@
             border-radius: 8px;
             border: 1px solid #2a3650;
             font-size: 0.95rem;
-            line-height: 1.5;
             text-align: left;
         }
 
@@ -115,48 +83,62 @@
         .liste-tuiles {
             color: #bdc3c7;
             font-style: italic;
-            word-wrap: break-word;
-            margin: 5px 0 0 0;
         }
 
-        /* Petit statut de chargement pendant que l'OCR réfléchit */
         #status-ocr {
             font-size: 0.9rem;
             color: #bdc3c7;
             margin-top: 10px;
             font-style: italic;
         }
+
+        /* Badges de couleur pour l'affichage des tuiles */
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            margin: 2px;
+            color: #fff;
+        }
+        .badge-rouge { background-color: #e74c3c; }
+        .badge-bleu { background-color: #2980b9; }
+        .badge-noir { background-color: #2c3e50; border: 1px solid #bdc3c7; }
+        .badge-jaune { background-color: #f1c40f; color: #333; }
+        .badge-joker { background-color: #9b59b6; }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>🧩 Arbitre Rummikub <span class="subtitle">- Scan OCR</span></h1>
+        <h1>🧩 Arbitre Rummikub <span class="subtitle">- Photo OCR</span></h1>
     </header>
 
     <main>
-        <p class="welcome-text">Placez une tuile dans le cadre vert et cliquez sur "Scanner".</p>
+        <p class="welcome-text">Prenez une photo bien nette de vos tuiles restantes (alignées ou côte à côte).</p>
 
         <div class="rummikub-card">
-            <div id="camera-wrapper">
-                <video id="video" autoplay playsinline></video>
-                <div class="viseur"></div>
+            <div class="file-input-wrapper">
+                <button class="btn-choose-file">📸 Prendre une photo / Image</button>
+                <!-- L'attribut capture="environment" force l'ouverture directe de l'appareil photo arrière sur mobile -->
+                <input type="file" id="file-selector" accept="image/*" capture="environment" onchange="analyserPhoto(event)">
             </div>
 
-            <div id="status-ocr">Prêt à scanner</div>
-
-            <div class="action-group" style="margin-top: 15px;">
-                <button id="btn-start" onclick="demarrerCamera()">Activer la caméra</button>
-                <button id="btn-scan" onclick="scannerTuile()" disabled>Scanner la tuile</button>
-                <button id="btn-joker" onclick="ajouterJoker()" disabled>+ Ajouter Joker</button>
-                <button id="btn-clear" onclick="reinitialiser()">Vider</button>
+            <div id="status-ocr">En attente d'une photo...</div>
+            
+            <img id="img-preview" alt="Aperçu du chevalet">
+            
+            <div style="margin-top: 15px;">
+                <button onclick="ajouterJoker()" style="padding: 8px 15px; background: #212a42; border: 1px solid #2a3650; color: white; border-radius: 6px; cursor: pointer;">+ Ajouter Joker manuel</button>
+                <button onclick="reinitialiser()" style="padding: 8px 15px; background: #212a42; border: 1px solid #2a3650; color: white; border-radius: 6px; cursor: pointer; margin-left: 10px;">Vider</button>
             </div>
         </div>
 
         <div class="rummikub-card">
             <div class="result-display">
-                <strong>Tuiles enregistrées :</strong>
-                <p class="liste-tuiles" id="tuiles-scannees">Aucune tuile sur le chevalet</p>
+                <strong>Tuiles détectées :</strong>
+                <div class="liste-tuiles" id="tuiles-scannees">Aucune tuile pour le moment</div>
             </div>
             
             <div class="result-display" style="text-align: center;">
@@ -174,110 +156,143 @@
         Le Bon Jeu © Famille - Prêt pour la partie
     </footer>
 
-    <!-- Canvas caché servant à capturer la photo pour l'OCR -->
-    <canvas id="canvas-capture" style="display:none;" width="400" height="300"></canvas>
+    <!-- Canvas invisible pour manipuler l'image et analyser les couleurs des pixels -->
+    <canvas id="canvas-analyse" style="display:none;"></canvas>
 
-    <script type="text/javascript">
-        let fluxVideo = null;
+    <script>
         let listeTuilesScannees = [];
         let totalPoints = 0;
-        let ocrWorker = null;
 
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas-capture');
-        const btnStart = document.getElementById('btn-start');
-        const btnScan = document.getElementById('btn-scan');
-        const btnJoker = document.getElementById('btn-joker');
+        const imgPreview = document.getElementById('img-preview');
         const txtTuiles = document.getElementById('tuiles-scannees');
         const txtTotal = document.getElementById('total-points');
         const statusOcr = document.getElementById('status-ocr');
+        const canvas = document.getElementById('canvas-analyse');
+        const ctx = canvas.getContext('2d');
 
-        // Initialisation de la caméra
-        async function demarrerCamera() {
-            btnStart.disabled = true;
-            statusOcr.innerText = "Initialisation de la caméra...";
+        async function analyserPhoto(event) {
+            const fichier = event.target.files[0];
+            if (!fichier) return;
 
-            try {
-                fluxVideo = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: "environment", width: 640, height: 480 }
-                });
-                video.srcObject = fluxVideo;
-                
-                // Préparer le moteur Tesseract à l'avance pour éviter la latence au premier scan
-                statusOcr.innerText = "Chargement du moteur de lecture...";
-                ocrWorker = await Tesseract.createWorker('eng'); // 'eng' ou 'fra' fonctionnent bien pour les chiffres
-                
-                // Configurer Tesseract pour qu'il ne cherche QUE des chiffres (gros gain de précision !)
-                await ocrWorker.setParameters({
-                    tessedit_char_whitelist: '0123456789',
-                });
+            statusOcr.innerText = "Chargement de l'image...";
+            
+            // Afficher l'aperçu de la photo
+            imgPreview.src = URL.createObjectURL(fichier);
+            imgPreview.style.display = "inline-block";
 
-                statusOcr.innerText = "Caméra prête. Placez le chiffre dans le viseur.";
-                btnStart.style.display = "none";
-                btnScan.disabled = false;
-                btnJoker.disabled = false;
-            } catch (error) {
-                alert("Impossible d'accéder à la caméra : " + error);
-                btnStart.disabled = false;
-                btnStart.innerText = "Activer la caméra";
-                statusOcr.innerText = "Erreur de caméra.";
-            }
-        }
+            // Attendre que l'image charge en mémoire pour la copier dans le canvas
+            imgPreview.onload = async () => {
+                canvas.width = imgPreview.naturalWidth;
+                canvas.height = imgPreview.naturalHeight;
+                ctx.drawImage(imgPreview, 0, 0);
 
-        // Capture et Analyse OCR
-        async function scannerTuile() {
-            if (!fluxVideo || !ocrWorker) return;
+                statusOcr.innerText = "Analyse du texte et des chiffres (OCR)...";
 
-            btnScan.disabled = true;
-            statusOcr.innerText = "Lecture en cours... Ne bougez pas";
+                try {
+                    // Initialiser le worker Tesseract
+                    const worker = await Tesseract.createWorker('fra');
+                    
+                    // On configure pour chercher uniquement des chiffres (gros gain de précision)
+                    await worker.setParameters({
+                        tessedit_char_whitelist: '0123456789 ',
+                    });
 
-            // Dessiner l'image de la vidéo sur le canvas caché
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    // Demander à Tesseract de nous renvoyer les mots ET leurs positions (coordonnées x, y)
+                    const { data } = await worker.recognize(canvas);
+                    await worker.terminate();
 
-            try {
-                // Lancer la reconnaissance sur le canvas capturé
-                const { data: { text } } = await ocrWorker.recognize(canvas);
-                
-                // Nettoyer le texte trouvé (ne garder que les chiffres)
-                const chiffreExtrait = text.trim();
-                const valeur = parseInt(chiffreExtrait, 10);
+                    statusOcr.innerText = "Analyse des couleurs...";
+                    
+                    // Filtrer et traiter les chiffres trouvés
+                    let tuilesTrouveesSurCettePhoto = [];
 
-                // Vérifier si c'est un chiffre valide au Rummikub (entre 1 et 13)
-                if (!isNaN(valeur) && valeur >= 1 && valeur <= 13) {
-                    ajouterPoints(valeur, `Tuile ${valeur}`);
-                    statusOcr.innerText = `✅ Tuile ${valeur} détectée !`;
-                } else {
-                    statusOcr.innerText = `❌ Impossible de lire un chiffre valide (Trouvé : "${chiffreExtrait}")`;
+                    data.words.forEach(word => {
+                        const chiffre = parseInt(word.text.trim(), 10);
+                        
+                        // Si c'est un chiffre valide du Rummikub
+                        if (!isNaN(chiffre) && chiffre >= 1 && chiffre <= 13) {
+                            
+                            // On extrait la couleur dominante autour de ce chiffre grâce au Canvas
+                            const couleurDetectee = determinerCouleurPixel(word.bbox);
+                            
+                            tuilesTrouveesSurCettePhoto.push({
+                                chiffre: chiffre,
+                                couleur: couleurDetectee
+                            });
+                        }
+                    });
+
+                    if(tuilesTrouveesSurCettePhoto.length > 0) {
+                        enregistrerTuiles(tuilesTrouveesSurCettePhoto);
+                        statusOcr.innerText = `✅ Analyse terminée ! ${tuilesTrouveesSurCettePhoto.length} tuiles détectées.`;
+                    } else {
+                        statusOcr.innerText = "⚠️ Aucun chiffre lisible détecté. Prenez la photo de plus près.";
+                    }
+
+                } catch (error) {
+                    console.error(error);
+                    statusOcr.innerText = "💥 Erreur pendant l'analyse.";
                 }
-            } catch (err) {
-                console.error(err);
-                statusOcr.innerText = "💥 Erreur lors de l'analyse de l'image.";
-            }
-
-            btnScan.disabled = false;
+            };
         }
 
-        function ajouterPoints(valeur, texteAffichage) {
-            listeTuilesScannees.push(texteAffichage);
-            totalPoints += valeur;
+        // Algorithme d'analyse de couleur basé sur la boîte englobante (bbox) renvoyée par l'OCR
+        function determinerCouleurPixel(bbox) {
+            // On prend un échantillon de pixels au centre de la zone où le chiffre a été trouvé
+            const centerX = Math.floor(bbox.x0 + (bbox.x1 - bbox.x0) / 2);
+            const centerY = Math.floor(bbox.y0 + (bbox.y1 - bbox.y0) / 2);
+            
+            const pixelData = ctx.getImageData(centerX, centerY, 1, 1).data;
+            const r = pixelData[0];
+            const g = pixelData[1];
+            const b = pixelData[2];
 
-            txtTuiles.innerText = listeTuilesScannees.join(', ');
-            txtTotal.innerText = totalPoints;
+            // Logique de décision basique (Seuils de couleurs RVB)
+            if (r > 150 && g < 80 && b < 80) return "rouge";
+            if (r < 80 && g < 120 && b > 140) return "bleu";
+            if (r > 150 && g > 130 && b < 50) return "jaune";
+            
+            // Si c'est très sombre, c'est du noir
+            if (r < 80 && g < 80 && b < 80) return "noir"; 
+            
+            return "noir"; // Par défaut si incertain
         }
 
-        // Gérer le joker à part (comme il n'a pas de chiffre écrit, un bouton manuel est parfait)
+        function enregistrerTuiles(nouvellesTuiles) {
+            nouvellesTuiles.forEach(tuile => {
+                listeTuilesScannees.push(tuile);
+                totalPoints += tuile.chiffre;
+            });
+            mettreAJourAffichage();
+        }
+
         function ajouterJoker() {
-            ajouterPoints(30, "Joker (30)");
-            statusOcr.innerText = "🃏 Joker ajouté (+30 pts)";
+            listeTuilesScannees.push({ chiffre: 30, couleur: "joker" });
+            totalPoints += 30;
+            mettreAJourAffichage();
+            statusOcr.innerText = "🃏 Joker manuel ajouté (+30 pts)";
+        }
+
+        function mettreAJourAffichage() {
+            if (listeTuilesScannees.length === 0) {
+                txtTuiles.innerHTML = "Aucune tuile pour le moment";
+            } else {
+                txtTuiles.innerHTML = "";
+                listeTuilesScannees.forEach(t => {
+                    const label = t.couleur === "joker" ? "Joker" : t.chiffre;
+                    txtTuiles.innerHTML += `<span class="badge badge-${t.couleur}">${label}</span> `;
+                });
+            }
+            txtTotal.innerText = totalPoints;
         }
 
         function reinitialiser() {
             listeTuilesScannees = [];
             totalPoints = 0;
-            txtTuiles.innerText = "Aucune tuile sur le chevalet";
-            txtTotal.innerText = "0";
-            statusOcr.innerText = "Chevalet vidé.";
+            imgPreview.style.display = "none";
+            imgPreview.src = "";
+            mettreAJourAffichage();
+            statusOcr.innerText = "En attente d'une photo...";
         }
     </script>
 </body>

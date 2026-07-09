@@ -5,13 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Arbitre Rummikub - Le Bon Jeu</title>
     
+    <!-- Liaison avec ton fichier CSS existant -->
     <link rel="stylesheet" href="style.css">
 
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <!-- Chargement de Tesseract.js pour l'OCR (Reconnaissance de texte) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     
     <style>
-        /* Uniquement le style spécifique à la caméra et aux scores */
+        /* Style spécifique à la caméra et aux scores */
         .rummikub-card {
             background-color: #1a2236;
             border: 1px solid #2a3650;
@@ -21,7 +22,8 @@
             text-align: center;
         }
 
-        #webcam-container {
+        #camera-wrapper {
+            position: relative;
             margin: 0 auto 20px auto;
             max-width: 100%;
             width: 400px;
@@ -32,10 +34,25 @@
             aspect-ratio: 4/3;
         }
 
-        #webcam-container canvas {
+        #video {
             width: 100%;
-            height: auto;
+            height: 100%;
+            object-fit: cover;
             display: block;
+        }
+
+        /* Viseur pour aider l'utilisateur à centrer la tuile */
+        .viseur {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 110px;
+            border: 3px dashed #2ecc71;
+            border-radius: 8px;
+            pointer-events: none;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
         }
 
         .action-group {
@@ -101,25 +118,38 @@
             word-wrap: break-word;
             margin: 5px 0 0 0;
         }
+
+        /* Petit statut de chargement pendant que l'OCR réfléchit */
+        #status-ocr {
+            font-size: 0.9rem;
+            color: #bdc3c7;
+            margin-top: 10px;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
 
     <header>
-        <h1>🧩 Arbitre Rummikub <span class="subtitle">- Malus Caméra</span></h1>
+        <h1>🧩 Arbitre Rummikub <span class="subtitle">- Scan OCR</span></h1>
     </header>
 
     <main>
-        <p class="welcome-text">Scannez vos tuiles restantes pour calculer automatiquement votre score négatif.</p>
+        <p class="welcome-text">Placez une tuile dans le cadre vert et cliquez sur "Scanner".</p>
 
         <div class="rummikub-card">
-            <div id="webcam-container">
-                </div>
+            <div id="camera-wrapper">
+                <video id="video" autoplay playsinline></video>
+                <div class="viseur"></div>
+            </div>
 
-            <div class="action-group">
-                <button id="btn-start" onclick="init()">Activer la caméra</button>
+            <div id="status-ocr">Prêt à scanner</div>
+
+            <div class="action-group" style="margin-top: 15px;">
+                <button id="btn-start" onclick="demarrerCamera()">Activer la caméra</button>
                 <button id="btn-scan" onclick="scannerTuile()" disabled>Scanner la tuile</button>
-                <button id="btn-clear" onclick="reinitialiser()">Vider le chevalet</button>
+                <button id="btn-joker" onclick="ajouterJoker()" disabled>+ Ajouter Joker</button>
+                <button id="btn-clear" onclick="reinitialiser()">Vider</button>
             </div>
         </div>
 
@@ -144,93 +174,102 @@
         Le Bon Jeu © Famille - Prêt pour la partie
     </footer>
 
-    <script type="text/javascript">
-        const URL_MODELE = "https://teachablemachine.withgoogle.com/models/V9m8_X6vP/"; 
+    <!-- Canvas caché servant à capturer la photo pour l'OCR -->
+    <canvas id="canvas-capture" style="display:none;" width="400" height="300"></canvas>
 
-        let model, webcam, maxPredictions;
+    <script type="text/javascript">
+        let fluxVideo = null;
         let listeTuilesScannees = [];
         let totalPoints = 0;
+        let ocrWorker = null;
 
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas-capture');
         const btnStart = document.getElementById('btn-start');
         const btnScan = document.getElementById('btn-scan');
+        const btnJoker = document.getElementById('btn-joker');
         const txtTuiles = document.getElementById('tuiles-scannees');
         const txtTotal = document.getElementById('total-points');
+        const statusOcr = document.getElementById('status-ocr');
 
-        async function init() {
+        // Initialisation de la caméra
+        async function demarrerCamera() {
             btnStart.disabled = true;
-            btnStart.innerText = "Calculateur...";
-
-            const modelURL = URL_MODELE + "model.json";
-            const metadataURL = URL_MODELE + "metadata.json";
+            statusOcr.innerText = "Initialisation de la caméra...";
 
             try {
-                model = await tmImage.load(modelURL, metadataURL);
-                maxPredictions = model.getTotalClasses();
-
-                const flip = false; 
-                webcam = new tmImage.Webcam(400, 300, flip);
-                await webcam.setup({ facingMode: "environment" }); 
-                await webcam.play();
+                fluxVideo = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: "environment", width: 640, height: 480 }
+                });
+                video.srcObject = fluxVideo;
                 
-                document.getElementById("webcam-container").appendChild(webcam.canvas);
-                window.requestAnimationFrame(loop);
+                // Préparer le moteur Tesseract à l'avance pour éviter la latence au premier scan
+                statusOcr.innerText = "Chargement du moteur de lecture...";
+                ocrWorker = await Tesseract.createWorker('eng'); // 'eng' ou 'fra' fonctionnent bien pour les chiffres
+                
+                // Configurer Tesseract pour qu'il ne cherche QUE des chiffres (gros gain de précision !)
+                await ocrWorker.setParameters({
+                    tessedit_char_whitelist: '0123456789',
+                });
 
+                statusOcr.innerText = "Caméra prête. Placez le chiffre dans le viseur.";
                 btnStart.style.display = "none";
                 btnScan.disabled = false;
+                btnJoker.disabled = false;
             } catch (error) {
-                alert("Erreur d'accès à la caméra : " + error);
+                alert("Impossible d'accéder à la caméra : " + error);
                 btnStart.disabled = false;
                 btnStart.innerText = "Activer la caméra";
+                statusOcr.innerText = "Erreur de caméra.";
             }
         }
 
-        async function loop() {
-            webcam.update();
-            window.requestAnimationFrame(loop);
-        }
-
+        // Capture et Analyse OCR
         async function scannerTuile() {
-            if (!model || !webcam) return;
+            if (!fluxVideo || !ocrWorker) return;
 
-            const prediction = await model.predict(webcam.canvas);
-            
-            let meilleurePrediction = { className: "", probability: 0 };
-            for (let i = 0; i < maxPredictions; i++) {
-                if (prediction[i].probability > meilleurePrediction.probability) {
-                    meilleurePrediction = prediction[i];
-                }
-            }
+            btnScan.disabled = true;
+            statusOcr.innerText = "Lecture en cours... Ne bougez pas";
 
-            if (meilleurePrediction.probability > 0.75) {
-                const resultat = meilleurePrediction.className;
+            // Dessiner l'image de la vidéo sur le canvas caché
+            const context = canvas.getContext('2d');
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            try {
+                // Lancer la reconnaissance sur le canvas capturé
+                const { data: { text } } = await ocrWorker.recognize(canvas);
                 
-                if (resultat.toLowerCase() !== "vide" && resultat.toLowerCase() !== "background") {
-                    ajouterTuile(resultat);
+                // Nettoyer le texte trouvé (ne garder que les chiffres)
+                const chiffreExtrait = text.trim();
+                const valeur = parseInt(chiffreExtrait, 10);
+
+                // Vérifier si c'est un chiffre valide au Rummikub (entre 1 et 13)
+                if (!isNaN(valeur) && valeur >= 1 && valeur <= 13) {
+                    ajouterPoints(valeur, `Tuile ${valeur}`);
+                    statusOcr.innerText = `✅ Tuile ${valeur} détectée !`;
                 } else {
-                    alert("Aucune tuile reconnue.");
+                    statusOcr.innerText = `❌ Impossible de lire un chiffre valide (Trouvé : "${chiffreExtrait}")`;
                 }
-            } else {
-                alert("Détection incertaine, ajustez la distance.");
+            } catch (err) {
+                console.error(err);
+                statusOcr.innerText = "💥 Erreur lors de l'analyse de l'image.";
             }
+
+            btnScan.disabled = false;
         }
 
-        function ajouterTuile(nomClasse) {
-            let valeurPoints = 0;
+        function ajouterPoints(valeur, texteAffichage) {
+            listeTuilesScannees.push(texteAffichage);
+            totalPoints += valeur;
 
-            if (nomClasse.toLowerCase() === "joker") {
-                valeurPoints = 30; 
-            } else {
-                const nombreExtrait = nomClasse.match(/\d+/);
-                valeurPoints = nombreExtrait ? parseInt(nombreExtrait[0], 10) : 0;
-            }
+            txtTuiles.innerText = listeTuilesScannees.join(', ');
+            txtTotal.innerText = totalPoints;
+        }
 
-            if (valeurPoints > 0) {
-                listeTuilesScannees.push(nomClasse);
-                totalPoints += valeurPoints;
-
-                txtTuiles.innerText = listeTuilesScannees.join(', ');
-                txtTotal.innerText = totalPoints;
-            }
+        // Gérer le joker à part (comme il n'a pas de chiffre écrit, un bouton manuel est parfait)
+        function ajouterJoker() {
+            ajouterPoints(30, "Joker (30)");
+            statusOcr.innerText = "🃏 Joker ajouté (+30 pts)";
         }
 
         function reinitialiser() {
@@ -238,6 +277,7 @@
             totalPoints = 0;
             txtTuiles.innerText = "Aucune tuile sur le chevalet";
             txtTotal.innerText = "0";
+            statusOcr.innerText = "Chevalet vidé.";
         }
     </script>
 </body>

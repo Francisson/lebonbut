@@ -176,11 +176,9 @@
 
             statusOcr.innerText = "Chargement de l'image...";
             
-            // Afficher l'aperçu de la photo
             imgPreview.src = URL.createObjectURL(fichier);
             imgPreview.style.display = "inline-block";
 
-            // Attendre que l'image charge en mémoire pour la copier dans le canvas
             imgPreview.onload = async () => {
                 canvas.width = imgPreview.naturalWidth;
                 canvas.height = imgPreview.naturalHeight;
@@ -189,30 +187,29 @@
                 statusOcr.innerText = "Analyse du texte et des chiffres (OCR)...";
 
                 try {
-                    // Initialiser le worker Tesseract
                     const worker = await Tesseract.createWorker('fra');
                     
-                    // On configure pour chercher uniquement des chiffres (gros gain de précision)
                     await worker.setParameters({
-                        tessedit_char_whitelist: '0123456789 ',
+                        tessedit_char_whitelist: '0123456789',
                     });
 
-                    // Demander à Tesseract de nous renvoyer les mots ET leurs positions (coordonnées x, y)
                     const { data } = await worker.recognize(canvas);
                     await worker.terminate();
 
-                    statusOcr.innerText = "Analyse des couleurs...";
+                    statusOcr.innerText = "Analyse des couleurs et nettoyage...";
                     
-                    // Filtrer et traiter les chiffres trouvés
                     let tuilesTrouveesSurCettePhoto = [];
 
                     data.words.forEach(word => {
                         const chiffre = parseInt(word.text.trim(), 10);
                         
-                        // Si c'est un chiffre valide du Rummikub
-                        if (!isNaN(chiffre) && chiffre >= 1 && chiffre <= 13) {
+                        // --- LES DEUX SÉCURITÉS AJOUTÉES ICI ---
+                        // 1. On n'accepte que si Tesseract est sûr de lui à plus de 75%
+                        // 2. On ignore les "poussières" d'image (largeur de la boîte < 15 pixels)
+                        const largeurZone = word.bbox.x1 - word.bbox.x0;
+                        
+                        if (!isNaN(chiffre) && chiffre >= 1 && chiffre <= 13 && word.confidence > 75 && largeurZone > 15) {
                             
-                            // On extrait la couleur dominante autour de ce chiffre grâce au Canvas
                             const couleurDetectee = determinerCouleurPixel(word.bbox);
                             
                             tuilesTrouveesSurCettePhoto.push({
@@ -222,11 +219,14 @@
                         }
                     });
 
+                    // On vide l'ancien chevalet avant d'ajouter le nouveau scan
+                    reinitialiser();
+
                     if(tuilesTrouveesSurCettePhoto.length > 0) {
                         enregistrerTuiles(tuilesTrouveesSurCettePhoto);
                         statusOcr.innerText = `✅ Analyse terminée ! ${tuilesTrouveesSurCettePhoto.length} tuiles détectées.`;
                     } else {
-                        statusOcr.innerText = "⚠️ Aucun chiffre lisible détecté. Prenez la photo de plus près.";
+                        statusOcr.innerText = "⚠️ Aucun chiffre net détecté. Assurez-vous du contraste et de la netteté.";
                     }
 
                 } catch (error) {
